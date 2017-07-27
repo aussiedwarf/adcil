@@ -11,22 +11,15 @@ http://www.fileformat.info/format/bmp/egff.htm
 #include <stdlib.h>
 #include <string.h>
 
-typedef enum{
-  Unknown = 0,
-  Windows_2x,
-  Windows_3x,
-  Windows_NTx,
-  Windows_4x,
-  Windows_5x,
-  OS2_1x,
-  OS2_2x,
-} AdBmpType;
+
 
 #define BMP_HEADER_SIZE 14
 #define BMP_WINDOWS_2X_HEADER_SIZE 12
 #define BMP_WINDOWS_3X_HEADER_SIZE 40
 #define BMP_WINDOWS_4X_HEADER_SIZE 108
 #define BMP_WINDOWS_5X_HEADER_SIZE 124
+
+#define Color16ToColor32(x) (((x << 3) & 0xff) | ((x << 5) & 0xff00) | ((x << 8) & 0xff0000))
 
 
 int CheckFileType(const unsigned char *a_srcImage)
@@ -38,30 +31,135 @@ int CheckFileType(const unsigned char *a_srcImage)
   else return 0;
 }
 
-void LoadBGR16toBGRA32(const adUint8* const a_src,
+
+//potential to create short palette in small image and have the image address
+//entries that go beyond palette + image into overflow. SHould create safe
+//function to handlethese specific images
+void LoadBGR8Palette32ToBGRA32(const adUint8* const a_src,
                        const adUint32 a_width,
                        const adUint32 a_height,
                        const adUint32 a_pitchSrc,
                        adUint8* a_dest,
-                       const adUint32 a_pitcDest)
+                       const adUint32 a_pitcDest,
+                               const adUint8* const a_palette,
+                               const int a_paletteLength) //num palette enteries
 {
+  const uint32_t* palette = a_palette;
 
-}
+  uint32_t *dest = a_dest;
 
-void LoadBGR24toBGRA32(const adUint8* const a_src,
-                       const adUint32 a_width,
-                       const adUint32 a_height,
-                       const adUint32 a_pitchSrc,
-                       adUint8* a_dest,
-                       const adUint32 a_pitcDest)
-{
   for(int y = 0; y < a_height; y++)
   {
-    memcpy(a_dest + a_pitcDest*y, a_src + a_pitchSrc*y, size);
+    for(int x = 0; x < a_width; x++)
+    {
+      dest[x+y*pitchDest] = a_palette[a_src[x+y*a_pitchSrc]];
+    }
+
   }
 }
 
-void LoadBGRX32toBGRA32(const adUint8* const a_src,
+
+
+void LoadBGR16ToBGRA32(const adUint8* const a_src,
+                       const adUint32 a_width,
+                       const adUint32 a_height,
+                       const adUint32 a_pitchSrc,
+                       adUint8* a_dest,
+                       const adUint32 a_pitcDest)
+{
+  const uint32_t *src = a_src;
+  uint32_t *dest = a_dest;
+
+  int w = a_width & (~1); //get width rounded down
+  for(int y = 0; y < a_height; y++)
+  {
+    int x = 0;
+    int w = 0;
+
+    while(x < w)
+    {
+      *(dest + x+0) = Color16ToColor32(*(src + w)) & | 0xff000000;
+      *(dest + x+1) = Color16ToColor32(*(src + w) >> 16) & | 0xff000000;
+
+
+      x+=2;
+      w++;
+    }
+
+    if(a_width-w > 0)
+    {
+      *(dest + x+0) = Color16ToColor32(*(src + w)) & | 0xff000000;
+    }
+
+  }
+}
+
+void LoadBGR24ToBGRA32(const adUint8* const a_src,
+                       const adUint32 a_width,
+                       const adUint32 a_height,
+                       const adUint32 a_pitchSrc,
+                       adUint8* a_dest,
+                       const adUint32 a_pitcDest)
+{
+  const uint32_t *src = a_src;
+  uint32_t *dest = a_dest;
+
+  int w = a_width & (~3); //get width rounded down
+  for(int y = 0; y < a_height; y++)
+  {
+    int x = 0;
+    int w = 0;
+
+    while(x < w)
+    {
+      //memcpy(a_dest + a_pitcDest*y, a_src + a_pitchSrc*y, size);
+      *(dest + x+0) = *(src + w) & | 0xff000000;
+      *(dest + x+1) = (*(src + w) >> 24) | (*(src + w+1) << 8) | 0xff000000;
+      *(dest + x+2) = (*(src + w+1) >> 16) | (*(src + w+2) << 16) | 0xff000000;
+      *(dest + x+3) = *(src + w+2) >> 8;
+
+      x+=4;
+      w+=3;
+    }
+
+    if(a_width-w > 0)
+    {
+      *(dest + x+0) = *(src + w) & | 0xff000000;
+      if(a_width-w > 1)
+      {
+        *(dest + x+1) = (*(src + w) >> 24) | (*(src + w+1) << 8) | 0xff000000;
+        if(a_width-w > 2)
+        {
+          *(dest + x+2) = (*(src + w+1) >> 16) | (*(src + w+2) << 16) | 0xff000000;
+        }
+      }
+    }
+  }
+}
+
+
+void LoadBGRX32ToBGRA32(const adUint8* const a_src,
+                        const adUint32 a_width,
+                        const adUint32 a_height,
+                        const adUint32 a_pitchSrc,
+                        adUint8* a_dest,
+                        const adUint32 a_pitcDest)
+{
+  if(a_pitchDest == a_pitchSrc)
+  {
+    size_t size = a_pitchSrc * a_height;
+    memcpy(a_dest, a_src, size);
+  }
+  else
+  {
+    for(int y = 0; y < a_height; y++)
+    {
+      memcpy(a_dest + a_pitcDest*y, a_src + a_pitchSrc*y, size);
+    }
+  }
+}
+
+void LoadBGRA32ToBGRA32(const adUint8* const a_src,
                         const adUint32 a_width,
                         const adUint32 a_height,
                         const adUint32 a_pitchSrc,
@@ -195,22 +293,114 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
 
   //time to load data
   if(header.bitsPerPixel == 16)
-    LoadBGR16toBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
+    LoadBGR16ToBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
   else if(header.bitsPerPixel == 24)
-    LoadBGR24toBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
+    LoadBGR24ToBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
   else if(header.bitsPerPixel == 32)
-    LoadBGRX32toBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
+    LoadBGRX32ToBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
 
   return AD_IMG_ERR_OK;
   
 }
 
-AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdImage* a_image, const void* a_settings)
+AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdImage* a_image, const AdBmpFormat* a_settings)
 {
+  if(!a_file)
+    return AD_IMG_ERR_BADPARRAM;
+
+  if(!a_image)
+    return AD_IMG_ERR_BADPARRAM;
+
+  AdBmpType type = Windows_3x;
+  AdImageFormat format = AD_IMG_None;
+  AdImageHeaderBmp header;
+  memset(&header, 0, sizeof(AdImageHeaderBmp));
+
+  //determine filesize
+  int size = 0;
+  int sizeHeader = 0;
+  int width = 0;
+  int height = 0;
+  int pitch = 0;
+
+  //get format and type info, or guess based of image given
+  if(a_settings)
+  {
+    if(a_settings->type)
+      type = a_settings->type;
+    if(a_settings->format)
+      format = a_settings->format;
+  }
+
+  if(!format)
+  {
+    format = a_image->format;
+
+    //TODO, reverse rgb formats to bgr
+
+    if( !( (format == AD_IMG_BGR8) ||
+           (format == AD_IMG_BGR16) ||
+           (format == AD_IMG_BGR24) ||
+           (format == AD_IMG_BGRX32) ||
+           (format == AD_IMG_BGRA32) ||
+           (format == AD_IMG_Grey8) ||
+           (format == AD_IMG_Mono1)))
+    {
+      return AD_IMG_ERR;
+    }
+
+  }
+
+  switch(type)
+  {
+    case Windows_2x:
+      sizeHeader = BMP_WINDOWS_2X_HEADER_SIZE;
+      break;
+    case Windows_3x:
+      sizeHeader = BMP_WINDOWS_3X_HEADER_SIZE;
+      break;
+
+    case Windows_4x:
+      sizeHeader = BMP_WINDOWS_4X_HEADER_SIZE;
+      break;
+    case Windows_5x:
+      sizeHeader = BMP_WINDOWS_5X_HEADER_SIZE;
+      break;
+    default:
+      return AD_IMG_ERR;
+  }
+
+  width = a_image->width;
+  height = a_image->height;
+
+  size += sizeHeader + BMP_HEADER_SIZE;
+
+  if(format == AD_IMG_BGRA32 || format == AD_IMG_BGRX32)
+  {
+    pitch = a_image->width * 4;
+    size += height * pitch;
+  }
+  else if(format == AD_IMG_BGR24)
+  {
+    pitch = (a_image->width * 3 + 3) & ~3;
+    size += height * pitch;
+  }
+  else if(format == AD_IMG_BGR16)
+  {
+    pitch = (a_image->width * 2 + 3) & ~3;
+    size += height * pitch;
+  }
+  else if(format == AD_IMG_BGR8)
+  {
+    pitch = (a_image->width + 3) & ~3;
+    pitch += 256;
+    size += height * pitch;
+  }
+
   return AD_IMG_ERR;
 }
 
-AdImageError adSaveBmpPointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const void* a_settings)
+AdImageError adSaveBmpPointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const AdBmpFormat* a_settings)
 {
   return AD_IMG_ERR;
 }

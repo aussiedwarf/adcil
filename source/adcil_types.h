@@ -11,11 +11,20 @@ typedef char                adInt8;
 typedef short               adInt16;
 typedef int                 adInt32;
 typedef long long           adInt64;
+typedef bool                adBool;
 
 typedef enum
 {
+  AD_IMG_None = 0,//or unknown
   AD_IMG_RGBA32,
-  AD_IMG_BGRA32
+  AD_IMG_BGR,
+  AD_IMG_BGR8,
+  AD_IMG_BGR16,
+  AD_IMG_BGR24,
+  AD_IMG_BGRX32,
+  AD_IMG_BGRA32,
+  AD_IMG_Grey8,
+  AD_IMG_Mono1
 } AdImageFormat;
 
 typedef enum
@@ -46,5 +55,26 @@ typedef struct
   AdImageFormat   format;
   void*           streamIn;
 }AdImage;
+
+typedef enum
+{
+  AD_IMG_RED    = 0x01,
+  AD_IMG_GREEN  = 0x02,
+  AD_IMG_BLUE   = 0x04,
+  AD_IMG_ALPHA  = 0x08,
+  AD_IMG_GREY   = 0x10
+
+
+} AdImageColor;
+
+typedef struct {
+  adUint8 numComponents; //num
+  adUint8 bits[4];
+  adUint8 pos[4];
+
+
+} AdImageFormatRaw;
+
+
 
 #endif

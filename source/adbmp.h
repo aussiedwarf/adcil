@@ -44,10 +44,30 @@ typedef struct {
   adUint32        reserved;
 } AdImageHeaderBmp;
 
+typedef enum{
+  Unknown = 0,
+  Windows_2x,
+  Windows_3x,
+  Windows_NTx,
+  Windows_4x,
+  Windows_5x,
+  OS2_1x,
+  OS2_2x,
+} AdBmpType;
+
+typedef struct{
+  AdBmpType       type;
+  AdImageFormat   format;
+  adBool          compression;
+} AdBmpFormat;
+
 AdImageError adLoadBmp(const char *a_file, const int a_filenameLength, AdImage* a_destImage, int a_destFormat);
 AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size, AdImage* a_destImage, int a_destFormat);
-AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdImage* a_image, const void* a_settings);
-AdImageError adSaveBmpPointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const void* a_settings);
+
+//if settings is null then try to save as same format as image
+//if image type is unknown (set to 0) then guess best type (probably 3x)
+AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdImage* a_image, const AdBmpFormat* a_settings);
+AdImageError adSaveBmpPointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const AdBmpFormat* a_settings);
 
 #endif //#define ADBMP_H
 
