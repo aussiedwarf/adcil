@@ -11,7 +11,11 @@ typedef char                adInt8;
 typedef short               adInt16;
 typedef int                 adInt32;
 typedef long long           adInt64;
+#if 0
 typedef bool                adBool;
+#else
+typedef int                 adBool;
+#endif
 
 typedef enum
 {

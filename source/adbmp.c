@@ -32,54 +32,70 @@ int CheckFileType(const unsigned char *a_srcImage)
 }
 
 
-//potential to create short palette in small image and have the image address
-//entries that go beyond palette + image into overflow. SHould create safe
-//function to handlethese specific images
-void LoadBGR8Palette32ToBGRA32(const adUint8* const a_src,
-                       const adUint32 a_width,
-                       const adUint32 a_height,
+
+static void LoadBGR8Palette32ToBGRA32(const adUint8* const a_src,
+                       const adUint32 a_width,    //width pixels
+                       const adUint32 a_height,   //height pixels
                        const adUint32 a_pitchSrc,
                        adUint8* a_dest,
-                       const adUint32 a_pitcDest,
-                               const adUint8* const a_palette,
-                               const int a_paletteLength) //num palette enteries
+                       const adUint32 a_pitchDest,
+                       const adUint8* const a_palette,
+                       const int a_paletteLength) //num palette enteries
 {
-  const uint32_t* palette = a_palette;
+  const uint32_t* palette = (uint32_t*) a_palette;
+  const adUint32 pitchDest = a_pitchDest/4;
 
-  uint32_t *dest = a_dest;
+  uint32_t *dest = (uint32_t*) a_dest;
 
-  for(int y = 0; y < a_height; y++)
+  /*If palette is short we need to check any entry does not go beyond palette
+   * into pixels or even beyond the buffer size*/
+  if(a_paletteLength < 256)
   {
-    for(int x = 0; x < a_width; x++)
+    for(uint32_t y = 0; y < a_height; y++)
     {
-      dest[x+y*pitchDest] = a_palette[a_src[x+y*a_pitchSrc]];
+      for(uint32_t x = 0; x < a_width; x++)
+      {
+        int p = a_src[x+y*a_pitchSrc];
+        if(p >= a_paletteLength)
+          p = a_paletteLength;
+        dest[x+y*pitchDest] = p;
+      }
     }
-
+  }
+  else
+  {
+    for(uint32_t y = 0; y < a_height; y++)
+    {
+      for(uint32_t x = 0; x < a_width; x++)
+      {
+        dest[x+y*pitchDest] = palette[a_src[x+y*a_pitchSrc]];
+      }
+    }
   }
 }
 
 
 
-void LoadBGR16ToBGRA32(const adUint8* const a_src,
+static void LoadBGR16ToBGRA32(const adUint8* const a_src,
                        const adUint32 a_width,
                        const adUint32 a_height,
                        const adUint32 a_pitchSrc,
                        adUint8* a_dest,
-                       const adUint32 a_pitcDest)
+                       const adUint32 a_pitchDest)
 {
-  const uint32_t *src = a_src;
-  uint32_t *dest = a_dest;
+  const uint32_t *src = (uint32_t*)a_src;
+  uint32_t *dest = (uint32_t*)a_dest;
 
-  int w = a_width & (~1); //get width rounded down
-  for(int y = 0; y < a_height; y++)
+  adUint32 w = a_width & (~1); //get width rounded down
+  for(adUint32 y = 0; y < a_height; y++)
   {
-    int x = 0;
-    int w = 0;
+    adUint32 x = 0;
+    adUint32 w = 0;
 
     while(x < w)
     {
-      *(dest + x+0) = Color16ToColor32(*(src + w)) & | 0xff000000;
-      *(dest + x+1) = Color16ToColor32(*(src + w) >> 16) & | 0xff000000;
+      *(dest + x+0) = Color16ToColor32(*(src + w)) | 0xff000000;
+      *(dest + x+1) = Color16ToColor32(*(src + w) >> 16) | 0xff000000;
 
 
       x+=2;
@@ -88,32 +104,32 @@ void LoadBGR16ToBGRA32(const adUint8* const a_src,
 
     if(a_width-w > 0)
     {
-      *(dest + x+0) = Color16ToColor32(*(src + w)) & | 0xff000000;
+      *(dest + x+0) = Color16ToColor32(*(src + w)) | 0xff000000;
     }
 
   }
 }
 
-void LoadBGR24ToBGRA32(const adUint8* const a_src,
+static void LoadBGR24ToBGRA32(const adUint8* const a_src,
                        const adUint32 a_width,
                        const adUint32 a_height,
                        const adUint32 a_pitchSrc,
                        adUint8* a_dest,
-                       const adUint32 a_pitcDest)
+                       const adUint32 a_pitchDest)
 {
-  const uint32_t *src = a_src;
-  uint32_t *dest = a_dest;
+  const uint32_t *src = (uint32_t*)a_src;
+  uint32_t *dest = (uint32_t*)a_dest;
 
-  int w = a_width & (~3); //get width rounded down
-  for(int y = 0; y < a_height; y++)
+  const uint32_t widthRounded = a_width & (~3); //get width rounded down
+  for(uint32_t y = 0; y < a_height; y++)
   {
-    int x = 0;
-    int w = 0;
+    uint32_t x = 0;
+    uint32_t w = 0;
 
-    while(x < w)
+    while(x < widthRounded)
     {
       //memcpy(a_dest + a_pitcDest*y, a_src + a_pitchSrc*y, size);
-      *(dest + x+0) = *(src + w) & | 0xff000000;
+      *(dest + x+0) = *(src + w) | 0xff000000;
       *(dest + x+1) = (*(src + w) >> 24) | (*(src + w+1) << 8) | 0xff000000;
       *(dest + x+2) = (*(src + w+1) >> 16) | (*(src + w+2) << 16) | 0xff000000;
       *(dest + x+3) = *(src + w+2) >> 8;
@@ -122,9 +138,9 @@ void LoadBGR24ToBGRA32(const adUint8* const a_src,
       w+=3;
     }
 
-    if(a_width-w > 0)
+    if(a_width-x > 0)
     {
-      *(dest + x+0) = *(src + w) & | 0xff000000;
+      *(dest + x+0) = *(src + w) | 0xff000000;
       if(a_width-w > 1)
       {
         *(dest + x+1) = (*(src + w) >> 24) | (*(src + w+1) << 8) | 0xff000000;
@@ -134,16 +150,18 @@ void LoadBGR24ToBGRA32(const adUint8* const a_src,
         }
       }
     }
+
+    dest += a_width;
+    src += ((a_pitchSrc + 3) & (~3))/4;
   }
 }
 
 
-void LoadBGRX32ToBGRA32(const adUint8* const a_src,
-                        const adUint32 a_width,
+static void LoadBGRX32ToBGRA32(const adUint8* const a_src,
                         const adUint32 a_height,
                         const adUint32 a_pitchSrc,
                         adUint8* a_dest,
-                        const adUint32 a_pitcDest)
+                        const adUint32 a_pitchDest)
 {
   if(a_pitchDest == a_pitchSrc)
   {
@@ -152,19 +170,18 @@ void LoadBGRX32ToBGRA32(const adUint8* const a_src,
   }
   else
   {
-    for(int y = 0; y < a_height; y++)
+    for(uint32_t y = 0; y < a_height; y++)
     {
-      memcpy(a_dest + a_pitcDest*y, a_src + a_pitchSrc*y, size);
+      memcpy(a_dest + a_pitchDest*y, a_src + a_pitchSrc*y, a_pitchDest);
     }
   }
 }
 
-void LoadBGRA32ToBGRA32(const adUint8* const a_src,
-                        const adUint32 a_width,
+static void LoadBGRA32ToBGRA32(const adUint8* const a_src,
                         const adUint32 a_height,
                         const adUint32 a_pitchSrc,
                         adUint8* a_dest,
-                        const adUint32 a_pitcDest)
+                        const adUint32 a_pitchDest)
 {
   if(a_pitchDest == a_pitchSrc)
   {
@@ -173,21 +190,90 @@ void LoadBGRA32ToBGRA32(const adUint8* const a_src,
   }
   else
   {
-    for(int y = 0; y < a_height; y++)
+    for(uint32_t y = 0; y < a_height; y++)
     {
-      memcpy(a_dest + a_pitcDest*y, a_src + a_pitchSrc*y, size);
+      memcpy(a_dest + a_pitchDest*y, a_src + a_pitchSrc*y, a_pitchDest);
     }
   }
 }
 
 
-AdImageError adLoadBmp(const char *a_file, const int a_filenameLength, AdImage* a_destImage, int a_destFormat)
+static void SaveBGRA32ToBGR24(const adUint8* const a_src,
+                       const adUint32 a_width,
+                       const adUint32 a_height,
+                       const adUint32 a_pitchSrc,
+                       adUint8* a_dest)
+{
+  adUint32* dest = (adUint32*)a_dest;
+  adUint32* src = (adUint32*)a_src;
+
+  if(!(a_width & 3) && a_pitchSrc == a_width)
+  {
+    uint32_t j = 0;
+    for(uint32_t i = 0; i< a_width*a_height; i+=4)
+    {
+      dest[j]    = src[i  ] & 0x00ffffff;       //0rgb
+      dest[j]   |= src[i+1]<<24;                //b000
+      dest[j+1]  = (src[i+1]>>8) & 0x0000ffff;  //00rg
+      dest[j+1] |= src[i+2]<<16;                //gb00
+      dest[j+2]  = (src[i+2]>>16) & 0xff;       //000r
+      dest[j+2] |= src[i+3] << 8;               //rgb0
+      j+=3;
+    }
+  }
+}
+
+static void SaveBGRA32ToBGRX32(const adUint8* const a_src,
+                       const adUint32 a_width,
+                       const adUint32 a_height,
+                       const adUint32 a_pitchSrc,
+                       adUint8* a_dest)
+{
+  adUint32* dest = (adUint32*)a_dest;
+
+  if(!(a_width & 3) && a_pitchSrc == a_width)
+  {
+    memcpy(a_dest, a_src, a_pitchSrc*a_height);
+    //set high byte to 0
+    for(uint32_t i = 0; i< a_width*a_height; i++)
+    {
+      dest[i] &= 0x00ffffff;
+    }
+  }
+  else
+  {
+
+  }
+
+}
+
+static void SaveBGRA32ToBGRA32(const adUint8* const a_src,
+                       const adUint32 a_width,
+                       const adUint32 a_height,
+                       const adUint32 a_pitchSrc,
+                       adUint8* a_dest)
+{
+  adUint32* dest = (adUint32*)a_dest;
+
+  if(!(a_width & 3) && a_pitchSrc == a_width)
+  {
+    memcpy(a_dest, a_src, a_pitchSrc*a_height);
+  }
+  else
+  {
+
+  }
+
+}
+
+
+AdImageError adLoadBmp(const char *a_file, const int a_filenameLength, AdImage* a_destImage, const void* a_destFormat)
 {
   return AD_IMG_ERR;
 }
 
 AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
-                              AdImage* a_destImage, int a_destFormat)
+                              AdImage* a_destImage, const void* a_destFormat)
 {
 
 
@@ -215,7 +301,7 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
     return AD_IMG_ERR;
 
   headerSize = (int)*((int*)(a_srcImage + BMP_HEADER_SIZE));
-  bitmapOffset = (int)*((int*)(a_srcImage + BMP_HEADER_SIZE + 10));
+  bitmapOffset = (int)*((int*)(a_srcImage + 10));
   /*
    * Note that the only difference between Windows 2.x BMP and OS/2 1.x BMP is
    * the data type of the Width and Height fields. For Windows 2.x, they are
@@ -258,15 +344,17 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
 
   adUint32 paletteSize = 0;
   adUint32 numPaletteEntries = 0;
-
-  if(fileType == Windows_2x)
-    paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_2X_HEADER_SIZE);
-  else if(fileType == Windows_3x)
-    paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_3X_HEADER_SIZE);
-  else if(fileType == Windows_4x)
-    paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_4X_HEADER_SIZE);
-  else if(fileType == Windows_5x)
-    paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_5X_HEADER_SIZE);
+  if(header.bitsPerPixel <= 8 && header.bitsPerPixel > 1)
+  {
+    if(fileType == Windows_2x)
+      paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_2X_HEADER_SIZE);
+    else if(fileType == Windows_3x)
+      paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_3X_HEADER_SIZE);
+    else if(fileType == Windows_4x)
+      paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_4X_HEADER_SIZE);
+    else if(fileType == Windows_5x)
+      paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_5X_HEADER_SIZE);
+  }
 
   if(fileType == Windows_2x)
     numPaletteEntries = paletteSize / 12;
@@ -283,6 +371,7 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
   a_destImage->height = header.height;
   a_destImage->pitch = a_destImage->width * 4;
   a_destImage->size = a_destImage->width * a_destImage->height * (a_destImage->bpp / 8);
+  a_destImage->format = AD_IMG_BGRA32;
 
   a_destImage->pixels = malloc(a_destImage->size);
 
@@ -297,7 +386,7 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
   else if(header.bitsPerPixel == 24)
     LoadBGR24ToBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
   else if(header.bitsPerPixel == 32)
-    LoadBGRX32ToBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
+    LoadBGRX32ToBGRA32(pixels, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
 
   return AD_IMG_ERR_OK;
   
@@ -313,16 +402,18 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
 
   AdBmpType type = Windows_3x;
   AdImageFormat format = AD_IMG_None;
-  AdImageHeaderBmp header;
-  memset(&header, 0, sizeof(AdImageHeaderBmp));
+  //AdImageHeaderBmp header;
+  //memset(&header, 0, sizeof(AdImageHeaderBmp));
 
   //determine filesize
   int size = 0;
   int sizeHeader = 0;
+  int sizePalette = 0;
   int width = 0;
   int height = 0;
   int pitch = 0;
-
+  int planes = 1;
+  int bpp = 24;
   //get format and type info, or guess based of image given
   if(a_settings)
   {
@@ -379,23 +470,175 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
   {
     pitch = a_image->width * 4;
     size += height * pitch;
+    if(format == AD_IMG_BGRA32)
+      planes = 4;
+    else
+      planes = 3;
+    bpp=32;
+    type = Windows_4x;
   }
   else if(format == AD_IMG_BGR24)
   {
     pitch = (a_image->width * 3 + 3) & ~3;
     size += height * pitch;
+    planes = 3;
+    bpp=24;
   }
   else if(format == AD_IMG_BGR16)
   {
     pitch = (a_image->width * 2 + 3) & ~3;
     size += height * pitch;
+    planes = 3;
+    bpp=16;
   }
   else if(format == AD_IMG_BGR8)
   {
+    planes = 3;
+    sizePalette = 256;
+
     pitch = (a_image->width + 3) & ~3;
-    pitch += 256;
+    pitch += sizePalette;
     size += height * pitch;
+    bpp=8;
+
+
+    //gen palette
   }
+
+  //use uint32 to request buffer aligned by
+  //uint32_t* rawBuffer = malloc(size+2);
+  uint8_t* destBuffer = malloc(size);
+  if(!destBuffer)
+    return AD_IMG_ERR;
+
+  uint32_t sizeHeaderTotal = sizeHeader + BMP_HEADER_SIZE + sizePalette;
+
+  uint32_t* ptrU32;
+  uint16_t* ptrU16;
+
+  destBuffer[0] = 'B';
+  destBuffer[1] = 'M';
+  ptrU32 = (uint32_t*)(destBuffer+2);
+  ptrU16 = (uint16_t*)(destBuffer+2);
+  *ptrU32 = size;
+
+  //set reserved
+  *(ptrU32+1) = 0;
+
+  //set offset
+  *(ptrU32+2) = sizeHeaderTotal;
+
+  //write type header
+  //Windows_2x
+  //header size
+  *(ptrU32+3) = sizeHeader;
+
+  //width
+  *(ptrU32+4) = width;
+
+  //height
+  *(ptrU32+5) = height;
+
+  //planes
+  *(ptrU16+12) = 1;
+
+  //bpp
+  /*BitsPerPixel is the number of bits per pixel in each plane. This value will
+   * be in the range 1 to 24; the values 1, 4, 8, and 24 are the only values
+   * considered legal by the Windows 2.x and 3.x API.
+   *
+  */
+  *(ptrU16+13) = bpp;
+
+  if(type == Windows_3x || type == Windows_4x || type == Windows_5x)
+  {
+      //DWORD Compression;     /* Compression methods used */
+    *(ptrU32+7) = 0;
+      //DWORD SizeOfBitmap;    /* Size of bitmap in bytes */
+    *(ptrU32+8) = 0;
+      //LONG  HorzResolution;  /* Horizontal resolution in pixels per meter */
+    *(ptrU32+9) = 300;
+      //LONG  VertResolution;  /* Vertical resolution in pixels per meter */
+    *(ptrU32+10) = 300;
+      //DWORD ColorsUsed;      /* Number of colors in the image */
+    *(ptrU32+11) = 1 << bpp;
+      //DWORD ColorsImportant; /* Minimum number of important colors */
+    *(ptrU32+12) = 0;
+
+    if(type == Windows_4x || type == Windows_5x)
+    {
+
+      //DWORD RedMask;       /* Mask identifying bits of red component */
+      *(ptrU32+13) = 0xff0000;
+      //DWORD GreenMask;     /* Mask identifying bits of green component */
+      *(ptrU32+14) = 0xff00;
+      //DWORD BlueMask;      /* Mask identifying bits of blue component */
+      *(ptrU32+15) = 0xff;
+      //DWORD AlphaMask;     /* Mask identifying bits of alpha component */
+      *(ptrU32+16) = 0xff000000;
+      //DWORD CSType;        /* Color space type */
+      /*CSType is the color space type used by the bitmap data. Values for this
+       * field include 00h (calibrated RGB), 01h (device-dependent RGB),
+       * and 02h (device-dependent CMYK). Device-dependent RGB is the default
+       * color space. Calibrated RGB is defined by the 1931 CIE XYZ standard.
+       * */
+      *(ptrU32+16) = 0x00000000;
+      /* RedX, RedY, and RedZ specify the CIE X, Y, and Z coordinates,
+       * respectively, for the endpoint of the red component of a specified
+       * logical color space. These fields are used only when CSType is 00h
+       * (calibrated RGB).
+       * */
+      //LONG  RedX;          /* X coordinate of red endpoint */
+      *(ptrU32+17) = 0x0;
+      //LONG  RedY;          /* Y coordinate of red endpoint */
+      *(ptrU32+18) = 0x0;
+      //LONG  RedZ;          /* Z coordinate of red endpoint */
+      *(ptrU32+19) = 0x0;
+      //LONG  GreenX;        /* X coordinate of green endpoint */
+      *(ptrU32+20) = 0x0;
+      //LONG  GreenY;        /* Y coordinate of green endpoint */
+      *(ptrU32+21) = 0x0;
+      //LONG  GreenZ;        /* Z coordinate of green endpoint */
+      *(ptrU32+22) = 0x0;
+      //LONG  BlueX;         /* X coordinate of blue endpoint */
+      *(ptrU32+23) = 0x0;
+      //LONG  BlueY;         /* Y coordinate of blue endpoint */
+      *(ptrU32+24) = 0x0;
+      //LONG  BlueZ;         /* Z coordinate of blue endpoint */
+      *(ptrU32+25) = 0x0;
+      //DWORD GammaRed;      /* Gamma red coordinate scale value */
+      *(ptrU32+26) = 0x0;
+      //DWORD GammaGreen;    /* Gamma green coordinate scale value */
+      *(ptrU32+27) = 0x0;
+      //DWORD GammaBlue;     /* Gamma blue coordinate scale value */
+      *(ptrU32+28) = 0x0;
+
+      if(type == Windows_5x)
+      {
+        /*
+        adUint32        intent;
+        adUint32        profileData;
+        adUint32        profileSize;
+        adUint32        reserved;*/
+      }
+    }
+  }
+
+
+  if(format == AD_IMG_BGR24 && a_image->format == AD_IMG_BGRA32)
+    SaveBGRA32ToBGR24(a_image->pixels, a_image->width, a_image->height,
+                      a_image->pitch, destBuffer+sizeHeaderTotal);
+  else if(format == AD_IMG_BGRA32 && a_image->format == AD_IMG_BGRA32)
+    SaveBGRA32ToBGRA32(a_image->pixels, a_image->width, a_image->height,
+                      a_image->pitch, destBuffer+sizeHeaderTotal);
+
+
+  //write to file
+  FILE* file = fopen(a_file, "wb");
+  fwrite(destBuffer, 1, size, file);
+  fclose(file);
+
+  free(destBuffer);
 
   return AD_IMG_ERR;
 }

@@ -2,17 +2,18 @@
 #ifndef ADBMP_H
 #define ADBMP_H
 
-#include "source/adcil_types.h"
+#include "adcil_types.h"
 
 int adOpenBmp();
 
 typedef struct {
+  /* Windows 2.x 12 bytes */
   adUint32        sizeHeader;
   adInt32         width;
   adInt32         height;
   adUint16        planes;          /* Number of color planes */
   adUint16        bitsPerPixel;    /* Number of bits per pixel */
-  /* Windows 3.x */
+  /* Windows 3.x 40 bytes */
   adUint32        compression;     /* Compression methods used */
   adUint32        sizeFile;        /* Size of bitmap in bytes */
   adInt32         resolutionHorz;  /* Horizontal resolution in pixels per meter */
@@ -61,8 +62,8 @@ typedef struct{
   adBool          compression;
 } AdBmpFormat;
 
-AdImageError adLoadBmp(const char *a_file, const int a_filenameLength, AdImage* a_destImage, int a_destFormat);
-AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size, AdImage* a_destImage, int a_destFormat);
+AdImageError adLoadBmp(const char *a_file, const int a_filenameLength, AdImage* a_destImage, const void* a_destFormat);
+AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size, AdImage* a_destImage, const void* a_destFormat);
 
 //if settings is null then try to save as same format as image
 //if image type is unknown (set to 0) then guess best type (probably 3x)

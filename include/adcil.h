@@ -36,18 +36,34 @@ jpegxr
 #ifndef ADCIL_H
 #define ADCIL_H
 
-#include "source/adcil_types.h"
+#include "adcil_types.h"
 
 #include <stdio.h>
 
 
+/**\brief Initializes adcil threads.
+ *
+ * This function is optinal but must be called if threading or any hardware
+ * acceleration is used. adcilFinish() must be called to clean afterwards.
+ *
+ * \param a_workers number of thread workers to spawn. 0 creates none and -1
+ * lets adcil decide.
+ * \param a_setting Any setting such as specific hardwre acceleration
+ * \returns Returns true on success
+ **/
+adBool adcilInit(int a_workers, const void* a_settings);//creates thread workers
 
-void adcilInit(int a_workers);//creates thread workers
-void adcilFinish();//needed if workers are created or any streaming is ongoing
+
+/**\brief Frees adcil resources.
+ *
+ * This function only needs to be called if adcilInit is called. It will
+ * terminate any ongoing streaming and threads.
+ **/
+void adcilFinish();
 
 //loads a image given
-AdImageError adLoadImage(const char *a_file, const int a_filenameLength, AdImage* a_destImage, int a_destFormat);
-AdImageError adLoadImagePointer(const unsigned char *a_srcImage, size_t a_size, AdImage* a_destImage, int a_destFormat);
+AdImageError adLoadImage(const char *a_file, const int a_filenameLength, AdImage* a_destImage, const void* a_destFormat);
+AdImageError adLoadImagePointer(const unsigned char *a_srcImage, size_t a_size, AdImage* a_destImage, const void* a_destFormat);
 AdImageError adSaveImage(const char *a_file, const int a_filenameLength, const AdImage* a_image, const void* a_settings);
 AdImageError adSaveImagePointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const void* a_settings);
 
