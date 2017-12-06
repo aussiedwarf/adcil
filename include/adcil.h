@@ -27,7 +27,17 @@ pkm
 heif
 jpegxr
 
-
+software testing
+MacOS Preview
+Windows Viewer
+MS Paint XP-10
+IE 6-11
+Edge
+Firefox
+Chrome
+Safari
+Gimp
+Paint.net
 
 
 
@@ -48,10 +58,15 @@ jpegxr
  *
  * \param a_workers number of thread workers to spawn. 0 creates none and -1
  * lets adcil decide.
+ * \param a_memoryLimit The number of bytes to limit adcil to use internally.
+ * Adcil uses large buffers when encoding and decoding and this setting limits
+ * these buffers such that their total size will not go above this. Setting to
+ * 0 uses default vaule. Current default is a little over 1gb (enough for a
+ * 16kx16k rgba image).
  * \param a_setting Any setting such as specific hardwre acceleration
  * \returns Returns true on success
  **/
-adBool adcilInit(int a_workers, const void* a_settings);//creates thread workers
+adBool adcilInit(const int a_workers, const adUint64 a_memoryLimit, const void* a_settings);//creates thread workers
 
 
 /**\brief Frees adcil resources.

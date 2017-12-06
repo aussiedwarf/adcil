@@ -2,11 +2,14 @@
 
 SOurces
 http://www.fileformat.info/format/bmp/egff.htm
+https://blog.mozilla.org/nnethercote/2015/11/06/i-rewrote-firefoxs-bmp-decoder/
+https://github.com/jsummers/bmpsuite
 */
 
 
 #include "adbmp.h"
 #include "adcil.h"
+#include "adbuffer.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -132,7 +135,7 @@ static void LoadBGR24ToBGRA32(const adUint8* const a_src,
       *(dest + x+0) = *(src + w) | 0xff000000;
       *(dest + x+1) = (*(src + w) >> 24) | (*(src + w+1) << 8) | 0xff000000;
       *(dest + x+2) = (*(src + w+1) >> 16) | (*(src + w+2) << 16) | 0xff000000;
-      *(dest + x+3) = *(src + w+2) >> 8;
+      *(dest + x+3) = (*(src + w+2) >> 8) | 0xff000000;
 
       x+=4;
       w+=3;
@@ -207,7 +210,7 @@ static void SaveBGRA32ToBGR24(const adUint8* const a_src,
   adUint32* dest = (adUint32*)a_dest;
   adUint32* src = (adUint32*)a_src;
 
-  if(!(a_width & 3) && a_pitchSrc == a_width)
+  if(!(a_width & 3) && (a_pitchSrc/4) == a_width)
   {
     uint32_t j = 0;
     for(uint32_t i = 0; i< a_width*a_height; i+=4)
@@ -231,7 +234,7 @@ static void SaveBGRA32ToBGRX32(const adUint8* const a_src,
 {
   adUint32* dest = (adUint32*)a_dest;
 
-  if(!(a_width & 3) && a_pitchSrc == a_width)
+  if(!(a_width & 3) && (a_pitchSrc/4) == a_width)
   {
     memcpy(a_dest, a_src, a_pitchSrc*a_height);
     //set high byte to 0
@@ -255,7 +258,7 @@ static void SaveBGRA32ToBGRA32(const adUint8* const a_src,
 {
   adUint32* dest = (adUint32*)a_dest;
 
-  if(!(a_width & 3) && a_pitchSrc == a_width)
+  if(!(a_width & 3) && (a_pitchSrc/4) == a_width)
   {
     memcpy(a_dest, a_src, a_pitchSrc*a_height);
   }
@@ -264,6 +267,25 @@ static void SaveBGRA32ToBGRA32(const adUint8* const a_src,
 
   }
 
+}
+
+static void SaveBGRA32ToBGR16(const adUint8* const a_src,
+                       const adUint32 a_width,
+                       const adUint32 a_height,
+                       const adUint32 a_pitchSrc,
+                       adUint8* a_dest)
+{
+  adUint32* dest = (adUint32*)a_dest;
+  adUint32* src = (adUint32*)a_src;
+
+  if(!(a_width & 3) && (a_pitchSrc/4) == a_width)
+  {
+    for(adUint32 i = 0; i < a_width*a_height; i+=2)
+    {
+      dest[i>>1]  = 0;
+      dest[i>>1] |= 0;
+    }
+  }
 }
 
 
@@ -388,7 +410,7 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
   else if(header.bitsPerPixel == 32)
     LoadBGRX32ToBGRA32(pixels, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
 
-  return AD_IMG_ERR_OK;
+  return AD_IMG_OK;
   
 }
 
@@ -400,20 +422,26 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
   if(!a_image)
     return AD_IMG_ERR_BADPARRAM;
 
-  AdBmpType type = Windows_3x;
+  //bmp type to save to
+  AdBmpType type = Unknown;
+
+  //image format to save to
   AdImageFormat format = AD_IMG_None;
   //AdImageHeaderBmp header;
   //memset(&header, 0, sizeof(AdImageHeaderBmp));
 
   //determine filesize
-  int size = 0;
-  int sizeHeader = 0;
-  int sizePalette = 0;
+  adUint32 size = 0;
+  adUint32 dataSize = 0;
+  adUint32 sizeHeader = 0;
+  adUint32 sizePalette = 0;
+  adUint32 sizeMask = 0;
   int width = 0;
   int height = 0;
   int pitch = 0;
   int planes = 1;
   int bpp = 24;
+  int compression = 0;
   //get format and type info, or guess based of image given
   if(a_settings)
   {
@@ -442,6 +470,70 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
 
   }
 
+
+
+  width = a_image->width;
+  height = a_image->height;
+
+
+
+  if(format == AD_IMG_BGRA32 || format == AD_IMG_BGRX32)
+  {
+    pitch = a_image->width * 4;
+    dataSize = height * pitch;
+    size += dataSize;
+    if(format == AD_IMG_BGRA32)
+      planes = 4;
+    else
+      planes = 3;
+    bpp=32;
+    compression = 3;
+    sizeMask = 16;
+
+    //Apple preview does not appear to load bmp with v4 header and rgba
+    if(!type)
+      type = Windows_5x;
+  }
+  else if(format == AD_IMG_BGR24)
+  {
+    pitch = (a_image->width * 3 + 3) & ~3;
+    dataSize = height * pitch;
+    size += dataSize;
+    planes = 3;
+    bpp=24;
+
+    if(!type)
+      type = Windows_3x;
+  }
+  else if(format == AD_IMG_BGR16)
+  {
+    pitch = (a_image->width * 2 + 3) & ~3;
+    dataSize = height * pitch;
+    size += dataSize;
+    planes = 3;
+    bpp=16;
+    compression = 3;
+    sizeMask = 16;
+
+    if(!type)
+      type = Windows_3x;
+  }
+  else if(format == AD_IMG_BGR8)
+  {
+    planes = 3;
+    sizePalette = 256;
+
+    pitch = (a_image->width + 3) & ~3;
+    pitch += sizePalette;
+    dataSize = height * pitch;
+    size += dataSize;
+    bpp=8;
+
+    if(!type)
+      type = Windows_3x;
+    //gen palette
+  }
+
   switch(type)
   {
     case Windows_2x:
@@ -461,63 +553,146 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
       return AD_IMG_ERR;
   }
 
-  width = a_image->width;
-  height = a_image->height;
+  sizeHeader += sizeMask;
+  uint32_t sizeHeaderTotal = sizeHeader + BMP_HEADER_SIZE + sizePalette;
+  size += sizeHeaderTotal;
 
-  size += sizeHeader + BMP_HEADER_SIZE;
+
+  //request buffer then offset by 2 to align by 4 byte values after 2 byte 'bm'
+  //at the start.
+  adBuffer buffer;
+  buffer.buffer = malloc(size+2);
+  buffer.start = buffer.buffer + 2;
+  buffer.pos = buffer.start;
+
+  if(!buffer.buffer)
+    return AD_IMG_ERR;
+
+
+
+  adBufferWrite(&buffer, "BM", 2);
+  adBufferWriteUint32(&buffer, size);
+
+  /*set reserved*/
+  adBufferWriteUint32(&buffer, 0);
+
+  /*set offset*/
+  adBufferWriteUint32(&buffer, sizeHeaderTotal);
+
+  /*Windows_2x*/
+
+  adBufferWriteUint32(&buffer, sizeHeader);
+  adBufferWriteUint32(&buffer, width);
+  adBufferWriteUint32(&buffer, height);
+
+  //planes
+  adBufferWriteUint16(&buffer, 1);
+
+  //bpp
+  /*BitsPerPixel is the number of bits per pixel in each plane. This value will
+   * be in the range 1 to 24; the values 1, 4, 8, and 24 are the only values
+   * considered legal by the Windows 2.x and 3.x API.
+   *
+  */
+  adBufferWriteUint16(&buffer, bpp);
+
+  if(type == Windows_3x || type == Windows_4x || type == Windows_5x)
+  {
+    //DWORD Compression;     /* Compression methods used */
+    adBufferWriteUint32(&buffer, compression);
+      //DWORD SizeOfBitmap;    /* Size of bitmap in bytes */
+    adBufferWriteUint32(&buffer, dataSize);
+      //LONG  HorzResolution;  /* Horizontal resolution in pixels per meter */
+    adBufferWriteUint32(&buffer, 2835);
+      //LONG  VertResolution;  /* Vertical resolution in pixels per meter */
+    adBufferWriteUint32(&buffer, 2835);
+      //DWORD ColorsUsed;      /* Number of colors in the image */
+    adBufferWriteUint32(&buffer, 0);
+      //DWORD ColorsImportant; /* Minimum number of important colors, 0 for all colors */
+    adBufferWriteUint32(&buffer, 0);
+  }
 
   if(format == AD_IMG_BGRA32 || format == AD_IMG_BGRX32)
   {
-    pitch = a_image->width * 4;
-    size += height * pitch;
-    if(format == AD_IMG_BGRA32)
-      planes = 4;
-    else
-      planes = 3;
-    bpp=32;
-    type = Windows_4x;
-  }
-  else if(format == AD_IMG_BGR24)
-  {
-    pitch = (a_image->width * 3 + 3) & ~3;
-    size += height * pitch;
-    planes = 3;
-    bpp=24;
+    //DWORD RedMask;       /* Mask identifying bits of red component */
+    adBufferWriteUint32(&buffer, 0x00ff0000);//0xff000000;//
+    //DWORD GreenMask;     /* Mask identifying bits of green component */
+    adBufferWriteUint32(&buffer, 0x0000ff00);//0x00ff0000;//
+    //DWORD BlueMask;      /* Mask identifying bits of blue component */
+    adBufferWriteUint32(&buffer, 0x000000ff);//0x0000ff00;//
+    //DWORD AlphaMask;     /* Mask identifying bits of alpha component */
+    adBufferWriteUint32(&buffer, 0xff000000);//0x000000ff;//
   }
   else if(format == AD_IMG_BGR16)
   {
-    pitch = (a_image->width * 2 + 3) & ~3;
-    size += height * pitch;
-    planes = 3;
-    bpp=16;
+    //DWORD RedMask;       /* Mask identifying bits of red component */
+    adBufferWriteUint32(&buffer, 0x0000f800);//0xff000000;//
+    //DWORD GreenMask;     /* Mask identifying bits of green component */
+    adBufferWriteUint32(&buffer, 0x000007e0);//0x00ff0000;//
+    //DWORD BlueMask;      /* Mask identifying bits of blue component */
+    adBufferWriteUint32(&buffer, 0x0000001f);//0x0000ff00;//
+    //DWORD AlphaMask;     /* Mask identifying bits of alpha component */
+    adBufferWriteUint32(&buffer, 0x00000000);//0x000000ff;//
   }
-  else if(format == AD_IMG_BGR8)
+
+  if(type == Windows_4x || type == Windows_5x)
   {
-    planes = 3;
-    sizePalette = 256;
+    //DWORD CSType;        /* Color space type */
+    /*CSType is the color space type used by the bitmap data. Values for this
+     * field include 00h (calibrated RGB), 01h (device-dependent RGB),
+     * and 02h (device-dependent CMYK). Device-dependent RGB is the default
+     * color space. Calibrated RGB is defined by the 1931 CIE XYZ standard.
+     * */
 
-    pitch = (a_image->width + 3) & ~3;
-    pitch += sizePalette;
-    size += height * pitch;
-    bpp=8;
+    adBufferWriteUint32(&buffer, 0x73524742);
+    //*(ptrU32+17) = 0x00000000;
 
 
-    //gen palette
+    /* RedX, RedY, and RedZ specify the CIE X, Y, and Z coordinates,
+     * respectively, for the endpoint of the red component of a specified
+     * logical color space. These fields are used only when CSType is 00h
+     * (calibrated RGB).
+     * */
+    //LONG  RedX;          /* X coordinate of red endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  RedY;          /* Y coordinate of red endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  RedZ;          /* Z coordinate of red endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  GreenX;        /* X coordinate of green endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  GreenY;        /* Y coordinate of green endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  GreenZ;        /* Z coordinate of green endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  BlueX;         /* X coordinate of blue endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  BlueY;         /* Y coordinate of blue endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //LONG  BlueZ;         /* Z coordinate of blue endpoint */
+    adBufferWriteUint32(&buffer, 0x0);
+    //DWORD GammaRed;      /* Gamma red coordinate scale value */
+    adBufferWriteUint32(&buffer, 0x0);
+    //DWORD GammaGreen;    /* Gamma green coordinate scale value */
+    adBufferWriteUint32(&buffer, 0x0);
+    //DWORD GammaBlue;     /* Gamma blue coordinate scale value */
+    adBufferWriteUint32(&buffer, 0x0);
+
+    if(type == Windows_5x)
+    {
+      /*
+      adUint32        intent;
+      adUint32        profileData;
+      adUint32        profileSize;
+      adUint32        reserved;*/
+      adBufferWriteUint32(&buffer, 0x0);
+      adBufferWriteUint32(&buffer, 0x0);
+      adBufferWriteUint32(&buffer, 0x0);
+      adBufferWriteUint32(&buffer, 0x0);
+    }
   }
 
-  //use uint32 to request buffer aligned by
-  //uint32_t* rawBuffer = malloc(size+2);
-  uint8_t* destBuffer = malloc(size);
-  if(!destBuffer)
-    return AD_IMG_ERR;
-
-  uint32_t sizeHeaderTotal = sizeHeader + BMP_HEADER_SIZE + sizePalette;
-
-  uint32_t* ptrU32;
-  uint16_t* ptrU16;
-
-  destBuffer[0] = 'B';
-  destBuffer[1] = 'M';
+#if 0
   ptrU32 = (uint32_t*)(destBuffer+2);
   ptrU16 = (uint16_t*)(destBuffer+2);
   *ptrU32 = size;
@@ -553,65 +728,78 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
   if(type == Windows_3x || type == Windows_4x || type == Windows_5x)
   {
       //DWORD Compression;     /* Compression methods used */
-    *(ptrU32+7) = 0;
+    *(ptrU32+7) = compression;
       //DWORD SizeOfBitmap;    /* Size of bitmap in bytes */
-    *(ptrU32+8) = 0;
+    *(ptrU32+8) = dataSize;
       //LONG  HorzResolution;  /* Horizontal resolution in pixels per meter */
-    *(ptrU32+9) = 300;
+    *(ptrU32+9) = 2835;
       //LONG  VertResolution;  /* Vertical resolution in pixels per meter */
-    *(ptrU32+10) = 300;
+    *(ptrU32+10) = 2835;
       //DWORD ColorsUsed;      /* Number of colors in the image */
-    *(ptrU32+11) = 1 << bpp;
-      //DWORD ColorsImportant; /* Minimum number of important colors */
+    *(ptrU32+11) = 0;
+      //DWORD ColorsImportant; /* Minimum number of important colors, 0 for all colors */
     *(ptrU32+12) = 0;
 
     if(type == Windows_4x || type == Windows_5x)
     {
-
-      //DWORD RedMask;       /* Mask identifying bits of red component */
-      *(ptrU32+13) = 0xff0000;
-      //DWORD GreenMask;     /* Mask identifying bits of green component */
-      *(ptrU32+14) = 0xff00;
-      //DWORD BlueMask;      /* Mask identifying bits of blue component */
-      *(ptrU32+15) = 0xff;
-      //DWORD AlphaMask;     /* Mask identifying bits of alpha component */
-      *(ptrU32+16) = 0xff000000;
+      if(format == AD_IMG_BGRA32 || format == AD_IMG_BGRX32)
+      {
+        //DWORD RedMask;       /* Mask identifying bits of red component */
+        *(ptrU32+13) = 0x00ff0000;//0xff000000;//
+        //DWORD GreenMask;     /* Mask identifying bits of green component */
+        *(ptrU32+14) = 0x0000ff00;//0x00ff0000;//
+        //DWORD BlueMask;      /* Mask identifying bits of blue component */
+        *(ptrU32+15) = 0x000000ff;//0x0000ff00;//
+        //DWORD AlphaMask;     /* Mask identifying bits of alpha component */
+        *(ptrU32+16) = 0xff000000;//0x000000ff;//
+      }
+      else
+      {
+        *(ptrU32+13) = 0;
+        *(ptrU32+14) = 0;
+        *(ptrU32+15) = 0;
+        *(ptrU32+16) = 0;
+      }
       //DWORD CSType;        /* Color space type */
       /*CSType is the color space type used by the bitmap data. Values for this
        * field include 00h (calibrated RGB), 01h (device-dependent RGB),
        * and 02h (device-dependent CMYK). Device-dependent RGB is the default
        * color space. Calibrated RGB is defined by the 1931 CIE XYZ standard.
        * */
-      *(ptrU32+16) = 0x00000000;
+
+      *(ptrU32+17) = 0x73524742;
+      //*(ptrU32+17) = 0x00000000;
+
+
       /* RedX, RedY, and RedZ specify the CIE X, Y, and Z coordinates,
        * respectively, for the endpoint of the red component of a specified
        * logical color space. These fields are used only when CSType is 00h
        * (calibrated RGB).
        * */
       //LONG  RedX;          /* X coordinate of red endpoint */
-      *(ptrU32+17) = 0x0;
-      //LONG  RedY;          /* Y coordinate of red endpoint */
       *(ptrU32+18) = 0x0;
-      //LONG  RedZ;          /* Z coordinate of red endpoint */
+      //LONG  RedY;          /* Y coordinate of red endpoint */
       *(ptrU32+19) = 0x0;
-      //LONG  GreenX;        /* X coordinate of green endpoint */
+      //LONG  RedZ;          /* Z coordinate of red endpoint */
       *(ptrU32+20) = 0x0;
-      //LONG  GreenY;        /* Y coordinate of green endpoint */
+      //LONG  GreenX;        /* X coordinate of green endpoint */
       *(ptrU32+21) = 0x0;
-      //LONG  GreenZ;        /* Z coordinate of green endpoint */
+      //LONG  GreenY;        /* Y coordinate of green endpoint */
       *(ptrU32+22) = 0x0;
-      //LONG  BlueX;         /* X coordinate of blue endpoint */
+      //LONG  GreenZ;        /* Z coordinate of green endpoint */
       *(ptrU32+23) = 0x0;
-      //LONG  BlueY;         /* Y coordinate of blue endpoint */
+      //LONG  BlueX;         /* X coordinate of blue endpoint */
       *(ptrU32+24) = 0x0;
-      //LONG  BlueZ;         /* Z coordinate of blue endpoint */
+      //LONG  BlueY;         /* Y coordinate of blue endpoint */
       *(ptrU32+25) = 0x0;
-      //DWORD GammaRed;      /* Gamma red coordinate scale value */
+      //LONG  BlueZ;         /* Z coordinate of blue endpoint */
       *(ptrU32+26) = 0x0;
-      //DWORD GammaGreen;    /* Gamma green coordinate scale value */
+      //DWORD GammaRed;      /* Gamma red coordinate scale value */
       *(ptrU32+27) = 0x0;
-      //DWORD GammaBlue;     /* Gamma blue coordinate scale value */
+      //DWORD GammaGreen;    /* Gamma green coordinate scale value */
       *(ptrU32+28) = 0x0;
+      //DWORD GammaBlue;     /* Gamma blue coordinate scale value */
+      *(ptrU32+29) = 0x0;
 
       if(type == Windows_5x)
       {
@@ -620,27 +808,34 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
         adUint32        profileData;
         adUint32        profileSize;
         adUint32        reserved;*/
+        *(ptrU32+30) = 0x0;
+        *(ptrU32+31) = 0x0;
+        *(ptrU32+32) = 0x0;
+        *(ptrU32+33) = 0x0;
       }
     }
   }
 
-
+#endif
   if(format == AD_IMG_BGR24 && a_image->format == AD_IMG_BGRA32)
     SaveBGRA32ToBGR24(a_image->pixels, a_image->width, a_image->height,
-                      a_image->pitch, destBuffer+sizeHeaderTotal);
+                      a_image->pitch, buffer.start+sizeHeaderTotal);
   else if(format == AD_IMG_BGRA32 && a_image->format == AD_IMG_BGRA32)
     SaveBGRA32ToBGRA32(a_image->pixels, a_image->width, a_image->height,
-                      a_image->pitch, destBuffer+sizeHeaderTotal);
+                      a_image->pitch, buffer.start+sizeHeaderTotal);
+  else if(format == AD_IMG_BGR16 && a_image->format == AD_IMG_BGRA32)
+    SaveBGRA32ToBGR16(a_image->pixels, a_image->width, a_image->height,
+                      a_image->pitch, buffer.start+sizeHeaderTotal);
 
 
   //write to file
   FILE* file = fopen(a_file, "wb");
-  fwrite(destBuffer, 1, size, file);
+  fwrite(buffer.start, 1, size, file);
   fclose(file);
 
-  free(destBuffer);
+  free(buffer.buffer);
 
-  return AD_IMG_ERR;
+  return AD_IMG_OK;
 }
 
 AdImageError adSaveBmpPointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const AdBmpFormat* a_settings)
