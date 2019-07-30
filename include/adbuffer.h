@@ -1,16 +1,22 @@
 #ifndef ADBUFFER_H
 #define ADBUFFER_H
 
+#include <stdint.h>
+
 #include "adcil_types.h"
 
 typedef struct {
-  void* buffer;
-  void* start;
-  void* pos;
-}adBuffer;
+  uint8_t* buffer;
+  uint8_t* start;
+  uint8_t* pos;
+} adBuffer;
 
 void adBufferWrite(adBuffer* a_buffer, const void* a_data, const int a_size);
-void adBufferWriteUint32(adBuffer* a_buffer, const adUint32 a_data);
-void adBufferWriteUint16(adBuffer* a_buffer, const adUint16 a_data);
+void adBufferWriteUint32(adBuffer* a_buffer, const uint32_t a_data);
+void adBufferWriteUint16(adBuffer* a_buffer, const uint16_t a_data);
+
+uint32_t adBufferReadUint32(const void* a_buffer);
+
+
 
 #endif

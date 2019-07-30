@@ -17,7 +17,11 @@ AdImageError adLoadImage(const char *a_file, const int a_filenameLength, AdImage
 
   FILE* file = NULL;
 
+#if _WIN32
+  fopen_s(&file, a_file, "r");
+#else
   file = fopen(a_file, "r");
+#endif
 
   if(!file)
     return AD_IMG_ERR;

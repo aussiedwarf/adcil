@@ -1,21 +1,24 @@
 #include "adpalette.h"
 
+#include <stdint.h>
+#include <assert.h>
 
-static void QuickSort(adUint32* a_value, adUint32* a_item, adUint32 a_start, adUint32 a_end, adUint32 a_pivot)
+
+static void QuickSort(uint32_t* a_value, uint32_t* a_item, uint32_t a_start, uint32_t a_end, uint32_t a_pivot)
 {
 
-  adUint32 center = 0;
+  uint32_t center = 0;
   for(int i = a_start; i < a_end; i++)
   {
-    if(a_value[i] > a_pivot)
+    //if(a_value[i] > a_pivot)
   }
 }
 
 
-static void PaletteByPopularity(const AdImage* a_image, adUint32* a_palette,
-                         adUint32* a_count, adUint32 a_colorCount)
+static void PaletteByPopularity(const AdImage* a_image, uint32_t* a_palette,
+                         uint32_t* a_count, uint32_t a_colorCount)
 {
-  adUint32 *colors = malloc(1<<24);
+  uint32_t *colors = malloc(1<<24);
   for(int i = 0; i < (1<<24); i++)
   {
     colors[i] = i;
@@ -28,22 +31,22 @@ static void PaletteByPopularity(const AdImage* a_image, adUint32* a_palette,
   free(colors);
 }
 
-void adCreatePalette(const AdImage* a_image, adUint32* a_palette)
+void adCreatePalette(const AdImage* a_image, uint32_t* a_palette)
 {
-  adUint32* count = malloc(1<<24);
+  uint32_t* count = malloc(1<<24);
   memset(count, 0, 1<<24);
 
-  adUint32 colorCount = 0;
+  uint32_t colorCount = 0;
 
-  const adUint32 pixels = a_image->pixels;
+  const uint32_t pixels = a_image->pixels;
 
   if(a_image->width == a_image->pitch)
   {
     for(int i = 0; i < a_image->width * a_image->height; i++)
     {
-      adUint32 c = count[0xffffff & pixels[i]];
-      colorCount += !c; //only increment if count of that color is 0
-      count[0xffffff & pixels[i]]++;
+      //uint32_t c = count[0xffffff & pixels[i]];
+      //colorCount += !c; //only increment if count of that color is 0
+      //count[0xffffff & pixels[i]]++;
     }
   }
   else

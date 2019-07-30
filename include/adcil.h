@@ -7,11 +7,12 @@ Goal for the library is to work on Windows, Macos, Linux, Android, iOS, x64, x64
 arm64. The library does not depend on any third party libraries and shall be as fast as 
 possible.
 
-compatible ansi c (20 years), c++03 (10 years)
+compatible c99 (20 years), c++03 (10 years)
 
 Compilers: gcc, clang, visual studio
 
 bmp
+ico
 gif
 png
 jpeg
@@ -24,7 +25,7 @@ flif
 ico
 dds
 pkm
-heif
+heif/heic
 jpegxr
 
 software testing
@@ -66,7 +67,7 @@ Paint.net
  * \param a_setting Any setting such as specific hardwre acceleration
  * \returns Returns true on success
  **/
-adBool adcilInit(const int a_workers, const adUint64 a_memoryLimit, const void* a_settings);//creates thread workers
+//adBool adcilInit(const int a_workers, const adUint64 a_memoryLimit, const void* a_settings);//creates thread workers
 
 
 /**\brief Frees adcil resources.
@@ -74,20 +75,23 @@ adBool adcilInit(const int a_workers, const adUint64 a_memoryLimit, const void* 
  * This function only needs to be called if adcilInit is called. It will
  * terminate any ongoing streaming and threads.
  **/
-void adcilFinish();
+//void adcilFinish();
 
-//loads a image given
+/**
+ * \param a_file path to file
+ * \param a_filenameLength length of file or 0 if null terminated
+ **/
 AdImageError adLoadImage(const char *a_file, const int a_filenameLength, AdImage* a_destImage, const void* a_destFormat);
 AdImageError adLoadImagePointer(const unsigned char *a_srcImage, size_t a_size, AdImage* a_destImage, const void* a_destFormat);
 AdImageError adSaveImage(const char *a_file, const int a_filenameLength, const AdImage* a_image, const void* a_settings);
 AdImageError adSaveImagePointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const void* a_settings);
 
 
-int adStreamInImage(const unsigned char *a_srcImage, size_t a_srcSize, unsigned char** a_destImage, int a_destFormat);
+//int adStreamInImage(const unsigned char *a_srcImage, size_t a_srcSize, unsigned char** a_destImage, int a_destFormat);
 
 //update stream in image with more data
-int adStreamInUpdate(const unsigned char *a_srcImage, size_t a_srcSize, unsigned char** a_destImage);
-int adStreamOutImage(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const void* a_setting);
+//int adStreamInUpdate(const unsigned char *a_srcImage, size_t a_srcSize, unsigned char** a_destImage);
+//int adStreamOutImage(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const void* a_setting);
 
 
 #endif //ADCIL

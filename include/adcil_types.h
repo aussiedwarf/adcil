@@ -2,12 +2,14 @@
 #define ADCIL_TYPES_H
 
 #include <stdio.h>
+#include <stdint.h>
 
 #define adInline inline
 
-typedef unsigned char       adUint8;
+#if 0
+typedef unsigned char       uint8_t;
 typedef unsigned short      adUint16;
-typedef unsigned int        adUint32;
+typedef unsigned int        uint32_t;
 typedef unsigned long long  adUint64;
 typedef char                adInt8;
 typedef short               adInt16;
@@ -16,9 +18,10 @@ typedef long long           adInt64;
 #if 0
 typedef bool                adBool;
 #else
-typedef int                 adBool;
+typedef char                adBool;
 #endif
 
+#endif
 /*
  *
  * Generic image format could be made up of 64 bits:
@@ -65,24 +68,25 @@ typedef enum
   AD_IMG_ERR_WRONGFILETYPE
 } AdImageError;
 
-
+#if 0
 typedef struct
 {
 
 } AdImageStream;
-
+#endif
 
 typedef struct
 {
-  unsigned char*  pixels;
-  int             width;
-  int             pitch;
-  int             height;
-  int             bpp;
+  uint8_t*        pixels;
+  uint32_t        width;
+  uint32_t        pitch;
+  uint32_t        height;
+  uint32_t        bpp;
+  uint32_t        align;
   size_t          size; //size of pixel data in bytes
   AdImageFormat   format;
   void*           streamIn;
-}AdImage;
+} AdImage;
 
 typedef enum
 {
@@ -96,9 +100,9 @@ typedef enum
 } AdImageColor;
 
 typedef struct {
-  adUint8 numComponents; //num
-  adUint8 bits[4];
-  adUint8 pos[4];
+  uint8_t numComponents; //num
+  uint8_t bits[4];
+  uint8_t pos[4];
 
 
 } AdImageFormatRaw;
