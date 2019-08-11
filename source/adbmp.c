@@ -10,6 +10,7 @@ https://github.com/jsummers/bmpsuite
 #include "adbmp.h"
 #include "adcil.h"
 #include "adbuffer.h"
+#include "adBits.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -300,8 +301,8 @@ AdImageError adLoadBmp(const char *a_file, const int a_filenameLength, AdImage* 
   return AD_IMG_ERR;
 }
 
-AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
-                              AdImage* a_destImage, const void* a_destFormat)
+AdImageError adLoadBmpPointer(const unsigned char* a_srcImage, size_t a_size,
+  AdImage* a_destImage, const void* a_destFormat)
 {
 
 
@@ -310,23 +311,25 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
 
   uint32_t bitmapOffset = 0;
 
-  if(!a_destImage)
-    return AD_IMG_ERR_BADPARRAM; 
-     
+  if (!a_destImage)
+    return AD_IMG_ERR_BADPARRAM;
+
   //sanity check
-  if(a_size < 14 )
+  if (a_size < 14)
   {
     return AD_IMG_ERR_FILETOOSMALL;
   }
-  
+
   int bmType = CheckFileType(a_srcImage);
-  if(!bmType )
+  if (!bmType)
     return AD_IMG_ERR_WRONGFILETYPE;
-    
-  size_t fileSize = (int) *((int*) (a_srcImage + 2));
-  
-  if(a_size != fileSize)
+
+  size_t fileSize = (int) * ((int*)(a_srcImage + 2));
+
+  if (a_size != fileSize)
     return AD_IMG_ERR;
+
+  AdImageFormat sourceFormat = (AD_COLOR_UNSIGNED << AD_COLOR_VARTYPE_SHIFT) | (AD_COLOR_RGB << AD_COLOR_COLORTYPE_SHIFT);
 
   //headerSize = (int)*((int*)(a_srcImage + BMP_HEADER_SIZE));
   headerSize = adBufferReuint32_t(a_srcImage + BMP_HEADER_SIZE);
@@ -337,37 +340,37 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
    * the data type of the Width and Height fields. For Windows 2.x, they are
    * signed shorts and for OS/2 1.x, they are unsigned shorts.
    * */
-  switch(headerSize)
+  switch (headerSize)
   {
     //12-64 is OS2_2x
-    case BMP_WINDOWS_2X_HEADER_SIZE:  //or OS2_1x
-      fileType = Windows_2x;
-      break;
-    case BMP_WINDOWS_3X_HEADER_SIZE:
-      //compression level 3 is NT
-      fileType = Windows_3x;
-      break;
-    case BMP_WINDOWS_2_INFO_HEADER_SIZE:
-      fileType = Windows_2_Info;
-      break;
-	  case BMP_WINDOWS_3_INFO_HEADER_SIZE:
-      fileType = Windows_3_Info;
-	    break;
-    case BMP_OS2_HEADER_SIZE:
-      fileType = OS2_2x;
-      break;
-    case BMP_WINDOWS_4X_HEADER_SIZE:
-      fileType = Windows_4x;
-      break;
-    case BMP_WINDOWS_5X_HEADER_SIZE:
-      fileType = Windows_5x;
-	    break;
-    default:
-      return AD_IMG_ERR;
+  case BMP_WINDOWS_2X_HEADER_SIZE:  //or OS2_1x
+    fileType = Windows_2x;
+    break;
+  case BMP_WINDOWS_3X_HEADER_SIZE:
+    //compression level 3 is NT
+    fileType = Windows_3x;
+    break;
+  case BMP_WINDOWS_2_INFO_HEADER_SIZE:
+    fileType = Windows_2_Info;
+    break;
+  case BMP_WINDOWS_3_INFO_HEADER_SIZE:
+    fileType = Windows_3_Info;
+    break;
+  case BMP_OS2_HEADER_SIZE:
+    fileType = OS2_2x;
+    break;
+  case BMP_WINDOWS_4X_HEADER_SIZE:
+    fileType = Windows_4x;
+    break;
+  case BMP_WINDOWS_5X_HEADER_SIZE:
+    fileType = Windows_5x;
+    break;
+  default:
+    return AD_IMG_ERR;
 
   }
 
-  if(fileSize < (size_t)headerSize + BMP_HEADER_SIZE)
+  if (fileSize < (size_t)headerSize + BMP_HEADER_SIZE)
     return AD_IMG_ERR;
 
   AdImageHeaderBmp header;
@@ -388,42 +391,124 @@ AdImageError adLoadBmpPointer(const unsigned char *a_srcImage, size_t a_size,
     header.bitsPerPixel = headerSmall.bitsPerPixel;
   }
 
-  
+
 
   //Work out size of image data taking into account that a scanline must be a multiple of 4 bytes
   uint32_t w = header.width * header.bitsPerPixel;  //in bits
-  uint32_t pitch = ((w + 31) & ~31)/8;     //round up to nearest 4 bytes
+  uint32_t pitch = ((w + 31) & ~31) / 8;     //round up to nearest 4 bytes
   uint32_t pixelSize = pitch * header.height;
 
   //get color palette size if used
-
   uint32_t paletteSize = 0;
   uint32_t numPaletteEntries = 0;
-  if(header.bitsPerPixel <= 8 && header.bitsPerPixel > 1)
+  if (header.bitsPerPixel <= 8 && header.bitsPerPixel > 1)
   {
-    if(fileType == Windows_2x)
+    sourceFormat |= (AD_COLOR_PALETTE);
+
+    if (fileType == Windows_2x)
       paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_2X_HEADER_SIZE);
-    else if(fileType == Windows_3x)
+    else if (fileType == Windows_3x)
       paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_3X_HEADER_SIZE);
     else if (fileType == Windows_2_Info)
       paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_2_INFO_HEADER_SIZE);
     else if (fileType == Windows_3_Info)
       paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_3_INFO_HEADER_SIZE);
-    else if(fileType == Windows_4x)
+    else if (fileType == Windows_4x)
       paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_4X_HEADER_SIZE);
-    else if(fileType == Windows_5x)
+    else if (fileType == Windows_5x)
       paletteSize = (bitmapOffset - BMP_HEADER_SIZE - BMP_WINDOWS_5X_HEADER_SIZE);
   }
 
-  if(fileType == Windows_2x)
+  if (fileType == Windows_2x)
     numPaletteEntries = paletteSize / 12;
   else
     numPaletteEntries = paletteSize / 16;
+
+  
+  if(header.compression == BI_BITFIELDS || header.compression  == BI_ALPHABITFIELDS){
+    typedef struct {
+      uint32_t msb;
+      uint32_t lsb;
+      uint64_t color;
+    } ColorSort;
+
+    uint32_t numColors = 0;
+    uint32_t numSort = 3;
+    ColorSort colorSort[4];
+
+    colorSort[0].msb = adMsbUint32(header.maskBlue);
+    colorSort[0].lsb = adLsbUint32(header.maskBlue);
+    colorSort[0].color = AD_COLOR_BLUE;
+
+    colorSort[1].msb = adMsbUint32(header.maskGreen);
+    colorSort[1].lsb = adLsbUint32(header.maskGreen);
+    colorSort[1].color = AD_COLOR_GREEN;
+
+    colorSort[2].msb = adMsbUint32(header.maskRed);
+    colorSort[2].lsb = adLsbUint32(header.maskRed);
+    colorSort[2].color = AD_COLOR_RED;
+    
+
+    if (fileType != Windows_2_Info) {
+      colorSort[3].msb = adMsbUint32(header.maskAlpha);
+      colorSort[3].lsb = adLsbUint32(header.maskAlpha);
+      colorSort[3].color = AD_COLOR_RED;
+      ++numSort;
+    }
+
+    for (int i = 0; i < numSort; ++i) {
+      if (colorSort[i].msb - colorSort[i].lsb) {
+        ++numColors;
+      }
+    }
+
+    for(int j = 0; j < numSort-1; ++j) {
+      for (int i = j; i < numSort - 1; ++i) {
+        //swap
+        if (colorSort[i].msb > colorSort[i + 1].msb) {
+          ColorSort tcolor;
+          memcpy(&tcolor, &colorSort[i], sizeof(ColorSort));
+          memcpy(&colorSort[i], &colorSort[i + 1], sizeof(ColorSort));
+          memcpy(&colorSort[i + 1], &tcolor, sizeof(ColorSort));
+        }
+      }
+    }
+
+    for (int i = 0; i < numColors; ++i) {
+      uint64_t numBits = colorSort[i].msb - colorSort[i].lsb;
+      sourceFormat |= AD_COLOR_BUILD(colorSort[i].color, numBits) << (i*10ULL + 14ULL);
+    }
+
+    uint64_t blankSize = header.bitsPerPixel - colorSort[numColors - 1].msb;
+
+    if (blankSize) {
+      sourceFormat |= AD_COLOR_BUILD(AD_COLOR_PAD, blankSize) << (numColors * 10ULL + 14ULL);
+      ++numColors;
+    }
+
+    sourceFormat |= numColors << 2ULL;
+
+  }
+  else {
+    switch (header.bitsPerPixel) {
+    case 8:
+
+      break;
+    case 16:
+      break;
+    case 24:
+      break;
+    case 32:
+      break;
+    }
+  }
 
   //more error checking
   //need to make sure total file size extends to where we expect
   if(fileSize != BMP_HEADER_SIZE + headerSize + pixelSize + paletteSize)
     return AD_IMG_ERR;
+
+  
 
   a_destImage->bpp = 32;
   a_destImage->width = header.width;
@@ -463,7 +548,7 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
   AdBmpType type = Unknown;
 
   //image format to save to
-  AdImageFormat format = AD_IMG_None;
+  AdImageFormat format = AD_IMG_NONE;
   //AdImageHeaderBmp header;
   //memset(&header, 0, sizeof(AdImageHeaderBmp));
 
@@ -493,7 +578,7 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
     format = a_image->format;
 
     //TODO, reverse rgb formats to bgr
-
+#if 0
     if( !( (format == AD_IMG_BGR8) ||
            (format == AD_IMG_BGR16) ||
            (format == AD_IMG_BGR24) ||
@@ -504,7 +589,7 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
     {
       return AD_IMG_ERR;
     }
-
+#endif
   }
 
 
@@ -631,7 +716,7 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
    * considered legal by the Windows 2.x and 3.x API.
    *
   */
-  adBufferWriteUint16(&buffer, bpp);
+  adBufferWriteUint16(&buffer, (uint16_t)bpp);
 
   if(type == Windows_3x || type == Windows_4x || type == Windows_5x)
   {

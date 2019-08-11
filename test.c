@@ -15,6 +15,10 @@ Other libraries to test performance against
 
 int main(int argc, char** argv)
 {
+  argc;
+  argv;
+
+
   AdImage image;
   memset(&image, 0, sizeof(AdImage));
   AdImageError err = adLoadImage("../mozilla/reftest/bmp/bmpsuite/g/pal8os2.bmp", 0, &image, 0);

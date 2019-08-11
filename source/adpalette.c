@@ -42,7 +42,7 @@ void adCreatePalette(const AdImage* a_image, uint32_t* a_palette)
 
   if(a_image->width == a_image->pitch)
   {
-    for(int i = 0; i < a_image->width * a_image->height; i++)
+    for(uint32_t i = 0; i < a_image->width * a_image->height; i++)
     {
       //uint32_t c = count[0xffffff & pixels[i]];
       //colorCount += !c; //only increment if count of that color is 0
@@ -65,7 +65,7 @@ void adCreatePalette(const AdImage* a_image, uint32_t* a_palette)
 
     if(a_image->width == a_image->pitch)
     {
-      for(int i = 0; i < a_image->width * a_image->height; i++)
+      for(uint32_t i = 0; i < a_image->width * a_image->height; i++)
       {
         a_palette[index] = a_image->pixels[i] & 0xffffff;
         index++;
