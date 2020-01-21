@@ -14,14 +14,14 @@ typedef struct {
   uint16_t        height;
   uint16_t        planes;          /* Number of color planes */
   uint16_t        bitsPerPixel;    /* Number of bits per pixel */
-} AdImageHeaderBmpSmall;
+} AdImageFileHeaderBmp;
 
 
 typedef struct {
   /* Windows 2.x 12 bytes */
   uint32_t        sizeHeader;
   int32_t         width;
-  int32_t         height;
+  int32_t         height; //TODO: negative numbers mean stored top down
   /* OS2 2x short 16 bytes */
   uint16_t        planes;          /* Number of color planes */
   uint16_t        bitsPerPixel;    /* Number of bits per pixel */
@@ -36,6 +36,7 @@ typedef struct {
   union {
     /* windows */
     struct {
+      /* Windows NT */
       uint32_t        maskRed;       /* Mask identifying bits of red component */
       uint32_t        maskGreen;     /* Mask identifying bits of green component */
       uint32_t        maskBlue;      /* Mask identifying bits of blue component */

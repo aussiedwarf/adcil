@@ -86,6 +86,8 @@ AdImageError adLoadImagePointer(const unsigned char *a_srcImage, size_t a_size, 
 AdImageError adSaveImage(const char *a_file, const int a_filenameLength, const AdImage* a_image, const void* a_settings);
 AdImageError adSaveImagePointer(unsigned char** a_file, size_t* a_size, const AdImage* a_image, const void* a_settings);
 
+void adFreeImage(AdImage* a_image);
+
 
 //int adStreamInImage(const unsigned char *a_srcImage, size_t a_srcSize, unsigned char** a_destImage, int a_destFormat);
 

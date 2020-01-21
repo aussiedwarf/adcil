@@ -8,16 +8,19 @@ INCLUDEPATH += include
 
 
 SOURCES +=  test.c \
+            source/adBits.c \
+            source/adbmp.c \
             source/adcil.c \
             source/adbuffer.c \
-            source/adbmp.c \
             source/adpalette.c
             
 
 
-HEADERS +=  include/adcil.h \
-            include/adcil_types.h \
-            include/adbuffer.h \
+HEADERS +=  include/adBits.h \
             include/adbmp.h \
-            include/adpalette.h
+            include/adbuffer.h \
+            include/adcil.h \
+            include/adcil_types.h \
+            include/adpalette.h \
+            include/adPlatform.h
             

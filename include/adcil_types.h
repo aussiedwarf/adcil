@@ -24,7 +24,7 @@ typedef char                adBool;
 #endif
 /*
  *
- * Generic image format coULLd be made up of 64 bits:
+ * Generic image format could be made up of 64 bits:
  * 2 bit flags (special type, palette)
  * 3 bit number of components (up to 5)
  * 2 bit type (signed, unsigned, float)
@@ -37,13 +37,13 @@ typedef char                adBool;
 #define AD_COLOR_VARTYPE_SHIFT 5ULL
 #define AD_COLOR_COLORTYPE_SHIFT 7ULL
 
-#define AD_COLOR_BUILD(colorType, numBits) colorType | (numBits << 6ULL)
+#define AD_COLOR_BUILD(colorType, numBits) (colorType | (numBits << 6ULL))
 
-#define AD_COLOR_BUILD1(flag, num, varType, colorType, color0) (flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL))
-#define AD_COLOR_BUILD2(flag, num, varType, colorType, color0, color1) (flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL))
-#define AD_COLOR_BUILD3(flag, num, varType, colorType, color0, color1, color2) (flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL) | (color2 << 34ULL))
-#define AD_COLOR_BUILD4(flag, num, varType, colorType, color0, color1, color2, color3) (flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL) | (color2 << 34ULL) | (color3 << 44ULL))
-#define AD_COLOR_BUILD5(flag, num, varType, colorType, color0, color1, color2, color3, color4) (flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL) | (color2 << 34ULL) | (color3 << 44ULL) | (color4 << 54ULL))
+#define AD_COLOR_BUILD1(flag, num, varType, colorType, color0) ((flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL)))
+#define AD_COLOR_BUILD2(flag, num, varType, colorType, color0, color1) ((flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL)))
+#define AD_COLOR_BUILD3(flag, num, varType, colorType, color0, color1, color2) ((flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL) | (color2 << 34ULL)))
+#define AD_COLOR_BUILD4(flag, num, varType, colorType, color0, color1, color2, color3) ((flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL) | (color2 << 34ULL) | (color3 << 44ULL)))
+#define AD_COLOR_BUILD5(flag, num, varType, colorType, color0, color1, color2, color3, color4) ((flag | (num << 2ULL) | (varType << 5ULL) | (colorType << 7ULL) | (color0 << 14ULL) | (color1 << 24ULL) | (color2 << 34ULL) | (color3 << 44ULL) | (color4 << 54ULL)))
 
 #define AD_COLOR_PALETTE 2ULL
 
@@ -78,7 +78,7 @@ typedef char                adBool;
 #define AD_IMG_BGR16 AD_COLOR_BUILD3(0ULL, 3ULL, AD_COLOR_UNSIGNED, AD_COLOR_RGB, AD_COLOR_BLUE5, AD_COLOR_GREEN6, AD_COLOR_RED5)
 #define AD_IMG_BGR24 AD_COLOR_BUILD3(0ULL, 3ULL, AD_COLOR_UNSIGNED, AD_COLOR_RGB, AD_COLOR_BLUE8, AD_COLOR_GREEN8, AD_COLOR_RED8)
 #define AD_IMG_BGRA32 AD_COLOR_BUILD4(0ULL, 4ULL, AD_COLOR_UNSIGNED, AD_COLOR_RGB, AD_COLOR_BLUE8, AD_COLOR_GREEN8, AD_COLOR_RED8, AD_COLOR_ALPHA8)
-#define AD_IMG_BGRX32 AD_COLOR_BUILD4(0ULL, 4ULL, AD_COLOR_UNSIGNED, AD_COLOR_RGB, AD_COLOR_BLUE8, AD_COLOR_GREEN8, AD_COLOR_RED8, AD_COLOR_BUILD(AD_COLOR_PAD,8ULL))
+#define AD_IMG_BGRX32 AD_COLOR_BUILD4(0ULL, 4ULL, AD_COLOR_UNSIGNED, AD_COLOR_RGB, AD_COLOR_BLUE8, AD_COLOR_GREEN8, AD_COLOR_RED8, AD_COLOR_PAD)
 
 #if 0
 typedef enum
@@ -113,7 +113,7 @@ typedef enum
 {
   AD_IMG_OK = 0,
   AD_IMG_ERR,
-  AD_IMG_ERR_MALLOC,  //malloc return nULLl, possibly out of memory
+  AD_IMG_ERR_MALLOC,  //malloc return null, possibly out of memory
   AD_IMG_ERR_BADPARRAM,
   AD_IMG_ERR_FILETOOSMALL,  //expected image file to be bigger
   AD_IMG_ERR_WRONGFILETYPE

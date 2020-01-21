@@ -74,3 +74,12 @@ AdImageError adSaveImagePointer(unsigned char** a_file, size_t* a_size, const Ad
   return AD_IMG_ERR;
 }
 
+void adFreeImage(AdImage* a_image)
+{
+  if(a_image){
+    free(a_image->pixels);
+    a_image->pixels = NULL;
+
+    //todo handle streamIn
+  }
+}
