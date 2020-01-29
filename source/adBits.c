@@ -14,11 +14,15 @@ uint32_t adMsbUint32(uint32_t a) {
 
   return r;
 #else
-  while (a >>= 1)
-  {
-    r++;
+  if (a){
+    while (a >>= 1)
+    {
+      r++;
+    }
+    return r;
   }
-  return r;
+  else
+    return 32;
 #endif
 }
 
@@ -32,11 +36,17 @@ uint32_t adLsbUint32(uint32_t a) {
 
   return r;
 #else
-  uint32_t r = 32;
-  while (a <<= 1)
-  {
-    r--;
+
+  if(a){
+    uint32_t r = 31;
+    while (a <<= 1)
+    {
+      r--;
+    }
+    return r;
   }
-  return r;
+  else
+    return 32;
+
 #endif
 }

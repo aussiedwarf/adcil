@@ -15,6 +15,7 @@ https://github.com/jsummers/bmpsuite
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 
 #define BM 1
 #define BA 2
@@ -41,9 +42,104 @@ static int CheckFileType(const unsigned char *a_srcImage)
   else return 0;
 }
 
+static void LoadAny(const uint8_t* const a_src,
+                    const uint32_t a_width,
+                    const uint32_t a_height,
+                    const uint32_t a_pitchSrc,
+                    uint8_t* a_dest,
+                    const uint32_t a_pitchDest,
+                    const AdImageFormat a_srcFormat,
+                    const AdImageFormat a_destFormat){
+  uint64_t colorSrcMask[4];
+  uint64_t colorSrcShift[4];
+  uint64_t colorSrcSize[4];
+  uint64_t colorDestMask[4];
+  uint64_t colorDestShift[4];
+  uint64_t colorDestSize[4];
+  uint64_t colorMask[4];
+  uint64_t colorShiftDown[4];
+  uint64_t colorShiftUp[4];
 
+  int numColorsDest = AD_COLOR_GET_NUM(a_destFormat);
+  int numColorsSrc = AD_COLOR_GET_NUM(a_srcFormat);
 
-static void LoadBGR8Palette32ToBGRA32(const uint8_t* const a_src,
+  uint64_t colorDest = a_destFormat >> 14ULL;
+  uint64_t bppDest = 0;
+  uint64_t bppSrc = 0;
+
+  //for each color in dest, find its color in src and build masks and shifts
+  for(int i = 0; i < numColorsDest; ++i){
+    uint64_t destBits = colorDest & 63ULL;
+    colorDestSize[i] = destBits;
+
+    colorDest >>= 6ULL;
+    uint64_t destType = colorDest & 15ULL;
+
+    colorDestMask[i] = 0xffffffffffffffffULL >> (64ULL - destBits);
+
+    bppSrc = 0;
+    uint64_t colorSrc = a_srcFormat >> 14ULL;
+    for(int j = 0; j < numColorsSrc; ++j){
+      uint64_t srcBits = colorSrc & 63ULL;
+
+      colorSrc >>= 6ULL;
+      uint64_t srcType = colorSrc & 15ULL;
+
+      if(srcType == destType){
+        colorSrcSize[i] = srcBits;
+        colorSrcShift[i] = bppSrc;
+        colorSrcMask[i] = 0xffffffffffffffffULL >> (64ULL - srcBits);
+
+        colorMask[i] = colorSrcMask[i] << colorSrcShift[i];
+        colorShiftDown[i] = colorSrcShift[i];
+        if(colorDestSize[i] < colorSrcSize[i])
+          colorShiftDown[i] += (colorSrcSize[i] + colorDestSize[i]);
+        colorShiftUp[i] = colorDestShift[i];
+      }
+      bppSrc += srcBits;
+      colorSrc >>= 4ULL;
+    }
+    bppDest += destBits;
+    colorDest >>= 4ULL;
+  }
+
+  //pos in bits
+  uint32_t srcx = 0;
+  uint32_t srcy = 0;
+  uint32_t destx = 0;
+  uint32_t desty = 0;
+  const uint32_t* src = (uint32_t*)a_src;
+
+  if((a_pitchDest*a_height % 64) == 0){
+    uint32_t* dest = (uint32_t*)a_dest;
+
+    for(uint32_t y = 0; y < a_height; ++y){
+      for(uint32_t x = 0; x < a_width; ++x){
+        uint64_t srcPixel = (uint64_t)(src[srcx / 32] >> (srcx&31)) | ((uint64_t)src[srcx / 32 + 1] << (32ULL - (srcx&31)));
+        uint64_t destPixel = 0;
+        for(int i = 0; i < numColorsDest; ++i){
+          destPixel |= (srcPixel & colorMask[i]) >> colorShiftDown[i] << colorShiftUp[i];
+        }
+        dest[destx/32] |= destPixel << (destx & 63);
+        dest[destx/32 + 1] |= destPixel >> (destx);//todo
+
+        srcx += bppSrc;
+        destx += bppDest;
+      }
+      srcy += a_pitchSrc * 8;
+      srcx = srcy;
+
+      desty += a_pitchDest * 8;
+      destx = desty;
+    }
+  }
+  else
+  {
+
+  }
+}
+
+static void LoadBGRX8Palette32ToBGRA32(const uint8_t* const a_src,
                        const uint32_t a_width,    //width pixels
                        const uint32_t a_height,   //height pixels
                        const uint32_t a_pitchSrc,
@@ -67,8 +163,8 @@ static void LoadBGR8Palette32ToBGRA32(const uint8_t* const a_src,
       {
         int p = a_src[x+y*a_pitchSrc];
         if(p >= a_paletteLength)
-          p = a_paletteLength;
-        dest[x+y*pitchDest] = p;
+          p = a_paletteLength-1;
+        dest[x+y*pitchDest] = palette[p];
       }
     }
   }
@@ -470,7 +566,7 @@ AdImageError adLoadBmpPointer(const unsigned char* a_srcImage, size_t a_size,
     }
 
     for (uint32_t i = 0; i < numSort; ++i) {
-      if (colorSort[i].msb - colorSort[i].lsb) {
+      if (colorSort[i].lsb != 32) {
         ++numColors;
       }
     }
@@ -488,11 +584,11 @@ AdImageError adLoadBmpPointer(const unsigned char* a_srcImage, size_t a_size,
     }
 
     for (uint32_t i = 0; i < numColors; ++i) {
-      uint64_t numBits = colorSort[i].msb - colorSort[i].lsb;
+      uint64_t numBits = colorSort[i].msb - colorSort[i].lsb + 1;
       sourceFormat |= AD_COLOR_BUILD(colorSort[i].color, numBits) << (i*10ULL + 14ULL);
     }
 
-    uint64_t blankSize = header.bitsPerPixel - colorSort[numColors - 1].msb;
+    uint64_t blankSize = header.bitsPerPixel - colorSort[numColors - 1].msb-1;
 
     if (blankSize) {
       sourceFormat |= AD_COLOR_BUILD(AD_COLOR_PAD, blankSize) << (numColors * 10ULL + 14ULL);
@@ -505,13 +601,15 @@ AdImageError adLoadBmpPointer(const unsigned char* a_srcImage, size_t a_size,
   else {
     switch (header.bitsPerPixel) {
     case 8:
-
       break;
     case 16:
+      sourceFormat |= AD_IMG_BGR16;
       break;
     case 24:
+      sourceFormat |= AD_IMG_BGR24;
       break;
     case 32:
+      sourceFormat |= AD_IMG_BGRX32;
       break;
     }
   }
@@ -540,19 +638,23 @@ AdImageError adLoadBmpPointer(const unsigned char* a_srcImage, size_t a_size,
 
   const uint8_t* pixels = a_srcImage + bitmapOffset;
 
+  AdImageFormat tt = AD_IMG_BGRX8;
+
   //time to load data
-  if(sourceFormat & AD_COLOR_PALETTE){
+  if(sourceFormat == AD_IMG_BGRX8){
     const uint8_t* palette = a_srcImage + headerSize + BMP_HEADER_SIZE;
-    LoadBGR8Palette32ToBGRA32(pixels, header.width, header.height, pitch,
+    LoadBGRX8Palette32ToBGRA32(pixels, header.width, header.height, pitch,
                               a_destImage->pixels, a_destImage->pitch,
                               palette, numPaletteEntries);
   }
-  else if(header.bitsPerPixel == 16)
+  else if(sourceFormat == AD_IMG_BGR16)
     LoadBGR16ToBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
-  else if(header.bitsPerPixel == 24)
+  else if(sourceFormat == AD_IMG_BGR24)
     LoadBGR24ToBGRA32(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
-  else if(header.bitsPerPixel == 32)
+  else if(sourceFormat == AD_IMG_BGRX32 || sourceFormat == AD_IMG_BGRA32)
     LoadBGRX32ToBGRA32(pixels, header.height, pitch, a_destImage->pixels, a_destImage->pitch);
+  else
+    LoadAny(pixels, header.width, header.height, pitch, a_destImage->pixels, a_destImage->pitch, sourceFormat, a_destImage->format);
 
   return AD_IMG_OK;  
 }
@@ -703,7 +805,6 @@ AdImageError adSaveBmp(const char *a_file, const int a_filenameLength, const AdI
 
 
   //request buffer then offset by 2 to align by 4 byte values after 2 byte 'bm'
-  //at the start.
   adBuffer buffer;
   buffer.buffer = malloc(size+2);
   buffer.start = buffer.buffer + 2;
